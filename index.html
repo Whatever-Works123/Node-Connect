@@ -1,1 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Node-Connect</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
+    <style>
+        /* Base styles and custom scrollbar */
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #1a1f1d; color: #e2e8f0; font-family: sans-serif; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333d39; border-radius: 4px; }
+        
+        /* Hide views by default */
+        .view-hidden { display: none !important; }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col antialiased selection:bg-[#6b9080] selection:text-[#1a1f1d]">
+
+    <!-- 1. LOADING VIEW -->
+    <div id="loading-view" class="flex items-center justify-center h-screen w-full absolute inset-0 z-50 bg-[#1a1f1d]">
+        <div class="animate-pulse flex flex-col items-center">
+            <div class="w-12 h-12 border-4 border-[#6b9080] border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-[#6b9080] tracking-widest text-sm">ENTERING THE MIST...</p>
+        </div>
+    </div>
+
+    <!-- 2. AUTHENTICATION VIEW -->
+    <div id="auth-view" class="view-hidden flex items-center justify-center h-screen w-full absolute inset-0 z-40 bg-[#1a1f1d] px-6">
+        <div class="bg-[#242b28] p-8 rounded-3xl w-full max-w-sm shadow-2xl border border-[#333d39]">
+            <h1 class="text-3xl font-light tracking-widest text-center mb-2">
+                NODE<span class="text-[#6b9080] font-bold">CONNECT</span>
+            </h1>
+            <p id="auth-subtitle" class="text-center text-[#94a3b8] text-sm mb-8 tracking-wide">Join the forest.</p>
+
+            <!-- Identity Setup Form (Seamless Login missing Username) -->
+            <form id="identity-form" class="view-hidden space-y-4">
+                <input type="text" id="identity-username" placeholder="Choose a Username" class="w-full bg-[#1a1f1d] border border-[#333d39] text-[#e2e8f0] px-4 py-3 rounded-xl outline-none focus:border-[#6b9080] transition-colors" required />
+                <p id="identity-error" class="text-red-400 text-xs text-center"></p>
+                <button type="submit" class="w-full py-3 mt-4 rounded-xl bg-[#6b9080] text-[#1a1f1d] font-bold tracking-wider active:scale-95 transition-transform">
+                    ENTER
+                </button>
+            </form>
+
+            <!-- Sign Up / Sign In Form -->
+            <form id="login-form" class="space-y-4">
+                <input type="text" id="auth-username" placeholder="Username" class="w-full bg-[#1a1f1d] border border-[#333d39] text-[#e2e8f0] px-4 py-3 rounded-xl outline-none focus:border-[#6b9080] transition-colors" required />
+                <input type="email" id="auth-email" placeholder="Email" class="w-full bg-[#1a1f1d] border border-[#333d39] text-[#e2e8f0] px-4 py-3 rounded-xl outline-none focus:border-[#6b9080] transition-colors" required />
+                <input type="password" id="auth-password" placeholder="Password" class="w-full bg-[#1a1f1d] border border-[#333d39] text-[#e2e8f0] px-4 py-3 rounded-xl outline-none focus:border-[#6b9080] transition-colors" required />
+                <p id="auth-error" class="text-red-400 text-xs text-center"></p>
+                <button type="submit" id="auth-submit-btn" class="w-full py-3 mt-4 rounded-xl bg-[#6b9080] text-[#1a1f1d] font-bold tracking-wider active:scale-95 transition-transform">
+                    SIGN UP
+                </button>
+            </form>
+
+            <p id="auth-toggle-btn" class="text-center mt-6 text-sm text-[#6b9080] cursor-pointer hover:underline">
+                Already have an account? Sign In
+            </p>
+        </div>
+    </div>
+
+    <!-- 3. MAIN APP INTERFACE -->
+    <div id="main-interface" class="view-hidden h-full w-full flex flex-col overflow-hidden relative">
+        
+        <!-- INBOX VIEW -->
+        <div id="inbox-view" class="app-tab view-hidden h-full flex flex-col bg-[#1a1f1d] flex-1 overflow-hidden">
+            <div class="pt-6 pb-4 px-6 bg-[#242b28] shadow-md z-10 flex items-center justify-between border-b border-[#333d39]">
+                <h1 class="text-xl font-light tracking-widest text-[#e2e8f0]">INBOX</h1>
+                <div id="inbox-username-badge" class="text-xs text-[#6b9080] bg-[#1a1f1d] px-3 py-1 rounded-full border border-[#333d39]"></div>
+            </div>
+            <div id="inbox-list" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+        </div>
+
+        <!-- DM VIEW -->
+        <div id="dm-view" class="app-tab view-hidden h-full flex flex-col bg-[#1a1f1d] flex-1 overflow-hidden absolute inset-0 z-20">
+            <div class="pt-6 pb-4 px-4 bg-[#242b28] shadow-md flex items-center space-x-4 border-b border-[#333d39]">
+                <button id="dm-back-btn" class="text-[#94a3b8] p-2 bg-[#1a1f1d] rounded-full active:scale-95">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+                <div class="flex-1">
+                    <h2 id="dm-chat-user" class="text-lg font-medium text-[#e2e8f0]"></h2>
+                </div>
+            </div>
+            <div id="dm-messages-list" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+            <form id="dm-form" class="p-4 bg-[#242b28] border-t border-[#333d39] flex items-center space-x-3">
+                <input type="text" id="dm-input" placeholder="Send a chat..." class="flex-1 bg-[#1a1f1d] text-[#e2e8f0] px-5 py-3 rounded-full outline-none border border-[#333d39] focus:border-[#6b9080] text-sm" />
+                <button type="submit" id="dm-send-btn" disabled class="bg-[#6b9080] text-[#1a1f1d] p-3 rounded-full disabled:opacity-50">
+                    <i data-lucide="send" class="w-5 h-5 ml-0.5"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- CAMERA VIEW -->
+        <div id="camera-view" class="app-tab view-hidden h-full w-full relative bg-black flex flex-col flex-1 overflow-hidden">
+            <!-- Viewfinder -->
+            <div id="camera-viewfinder" class="absolute inset-0 z-0">
+                <video id="camera-video" autoplay playsinline class="w-full h-full object-cover opacity-80"></video>
+                <div class="absolute inset-0 border-[1px] border-[#6b9080]/30 m-4 rounded-3xl pointer-events-none"></div>
+                <div class="absolute bottom-10 left-0 right-0 flex justify-center z-10">
+                    <button id="camera-capture-btn" class="w-20 h-20 rounded-full border-4 border-[#6b9080] flex items-center justify-center bg-black/20 backdrop-blur-sm active:scale-95 transition-transform">
+                        <div class="w-16 h-16 rounded-full bg-[#6b9080]/80"></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Captured Image Preview -->
+            <div id="camera-preview" class="view-hidden absolute inset-0 z-10 bg-black">
+                <img id="camera-img" class="w-full h-full object-cover" />
+                <div class="absolute bottom-10 left-0 right-0 flex justify-between px-10">
+                    <button id="camera-trash-btn" class="w-14 h-14 rounded-full bg-[#242b28]/80 text-white flex items-center justify-center backdrop-blur-md">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                    <button id="camera-send-to-btn" class="w-14 h-14 rounded-full bg-[#6b9080] text-[#1a1f1d] flex items-center justify-center shadow-lg active:scale-95 transition-transform">
+                        <i data-lucide="send" class="ml-1"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Send To Overlay -->
+            <div id="camera-send-overlay" class="view-hidden absolute inset-0 bg-black/70 backdrop-blur-md flex flex-col z-20">
+                <div class="p-6 pt-10 border-b border-[#333d39] flex justify-between items-center">
+                    <h2 class="text-white text-lg font-light tracking-widest">SEND TO...</h2>
+                    <button id="send-overlay-close" class="text-[#94a3b8] p-2">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div id="send-users-list" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+                <div class="p-6 pb-10 flex justify-between bg-gradient-to-t from-black to-transparent">
+                    <button id="send-overlay-trash" class="w-14 h-14 rounded-full bg-[#242b28]/80 text-white flex items-center justify-center backdrop-blur-md">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                    <button id="send-overlay-confirm" disabled class="w-14 h-14 rounded-full bg-[#6b9080] text-[#1a1f1d] flex items-center justify-center shadow-lg active:scale-95 transition-transform disabled:opacity-50">
+                        <i data-lucide="send" class="ml-1"></i>
+                    </button>
+                </div>
+            </div>
+            <canvas id="camera-canvas" class="hidden"></canvas>
+        </div>
+
+        <!-- SETTINGS VIEW -->
+        <div id="settings-view" class="app-tab view-hidden h-full p-8 flex flex-col items-center flex-1 overflow-y-auto">
+            <div class="w-24 h-24 bg-[#242b28] border-2 border-[#6b9080] rounded-full flex items-center justify-center mb-6">
+                <span id="settings-avatar" class="text-3xl text-[#6b9080]"></span>
+            </div>
+            <h2 class="text-2xl font-light mb-8 text-[#e2e8f0]">Zen Profile</h2>
+            <div class="w-full max-w-xs space-y-4">
+                <div class="flex flex-col space-y-2">
+                    <label class="text-xs text-[#94a3b8] tracking-widest uppercase ml-1">Your Identity</label>
+                    <input type="text" id="settings-name-input" class="w-full bg-[#242b28] border border-[#333d39] text-[#e2e8f0] px-4 py-3 rounded-xl outline-none focus:border-[#6b9080]" />
+                </div>
+                <div class="pt-8 border-t border-[#333d39] mt-8">
+                    <p class="text-xs text-[#94a3b8] text-center mb-4">Nodes are ephemeral. They disappear forever once closed. Screenshots will be detected and called out.</p>
+                    <button id="settings-randomize-btn" class="w-full py-3 rounded-xl border border-[#6b9080] text-[#6b9080] text-sm font-semibold tracking-wide active:bg-[#6b9080] active:text-[#1a1f1d] transition-colors">
+                        RANDOMIZE IDENTITY
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FULL SCREEN NODE VIEWER OVERLAY -->
+        <div id="node-viewer" class="view-hidden absolute inset-0 z-50 bg-black flex flex-col">
+            <div class="absolute top-0 left-0 right-0 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent z-10">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-[#242b28] rounded-full flex items-center justify-center border border-[#333d39]">
+                        <i data-lucide="eye" class="text-[#6b9080] w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <p id="node-viewer-sender" class="text-white text-sm font-semibold"></p>
+                        <p id="node-viewer-timer" class="text-red-400 text-xs font-bold animate-pulse">10s remaining</p>
+                    </div>
+                </div>
+                <button id="node-viewer-close" class="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white backdrop-blur-md">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <img id="node-viewer-img" class="w-full h-full object-cover" />
+        </div>
+
+        <!-- BOTTOM NAVIGATION -->
+        <div id="bottom-nav" class="bg-[#242b28] h-20 flex justify-around items-center px-6 pb-4 border-t border-[#333d39]">
+            <button id="nav-inbox" class="nav-btn flex flex-col items-center p-2 transition-colors text-[#94a3b8]" data-target="inbox-view">
+                <i data-lucide="message-circle"></i>
+                <span class="text-[10px] mt-1 tracking-wider">INBOX</span>
+            </button>
+            <button id="nav-camera" class="nav-btn flex flex-col items-center p-2 transition-colors text-[#6b9080]" data-target="camera-view">
+                <div id="nav-camera-bg" class="p-3 rounded-full bg-[#6b9080] text-[#1a1f1d]">
+                    <i data-lucide="camera" class="w-7 h-7"></i>
+                </div>
+            </button>
+            <button id="nav-settings" class="nav-btn flex flex-col items-center p-2 transition-colors text-[#94a3b8]" data-target="settings-view">
+                <i data-lucide="settings"></i>
+                <span class="text-[10px] mt-1 tracking-wider">ZEN</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN APP LOGIC -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "mock", authDomain: "mock", projectId: "mock", storageBucket: "mock", messagingSenderId: "mock", appId: "mock"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'node-connect-default';
+
+        // --- GLOBAL STATE ---
+        let state = {
+            user: null,
+            userName: '',
+            allUsers: [],
+            messages: [],
+            activeTab: 'camera-view',
+            activeChatUser: null,
+            viewingNode: null,
+            cameraStream: null,
+            capturedImg: null,
+            selectedUsers: [],
+            isSignUp: true,
+            nodeTimer: null,
+            nodeTimeLeft: 10,
+            unsubUsers: null,
+            unsubMsgs: null
+        };
+
+        // --- DOM ELEMENTS ---
+        const els = {
+            loadingView: document.getElementById('loading-view'),
+            authView: document.getElementById('auth-view'),
+            mainInterface: document.getElementById('main-interface'),
+            tabs: document.querySelectorAll('.app-tab'),
+            navBtns: document.querySelectorAll('.nav-btn'),
+            
+            // Auth
+            authTitle: document.getElementById('auth-subtitle'),
+            authUsername: document.getElementById('auth-username'),
+            loginForm: document.getElementById('login-form'),
+            identityForm: document.getElementById('identity-form'),
+            identityUsername: document.getElementById('identity-username'),
+            authToggleBtn: document.getElementById('auth-toggle-btn'),
+            authSubmitBtn: document.getElementById('auth-submit-btn'),
+            authError: document.getElementById('auth-error'),
+            identityError: document.getElementById('identity-error'),
+
+            // Inbox
+            inboxUsernameBadge: document.getElementById('inbox-username-badge'),
+            inboxList: document.getElementById('inbox-list'),
+
+            // DM
+            dmView: document.getElementById('dm-view'),
+            dmChatUser: document.getElementById('dm-chat-user'),
+            dmMessagesList: document.getElementById('dm-messages-list'),
+            dmInput: document.getElementById('dm-input'),
+            dmForm: document.getElementById('dm-form'),
+            dmSendBtn: document.getElementById('dm-send-btn'),
+            dmBackBtn: document.getElementById('dm-back-btn'),
+
+            // Settings
+            settingsAvatar: document.getElementById('settings-avatar'),
+            settingsNameInput: document.getElementById('settings-name-input'),
+            settingsRandomizeBtn: document.getElementById('settings-randomize-btn'),
+
+            // Camera
+            video: document.getElementById('camera-video'),
+            canvas: document.getElementById('camera-canvas'),
+            captureBtn: document.getElementById('camera-capture-btn'),
+            previewDiv: document.getElementById('camera-preview'),
+            previewImg: document.getElementById('camera-img'),
+            cameraTrashBtn: document.getElementById('camera-trash-btn'),
+            cameraSendToBtn: document.getElementById('camera-send-to-btn'),
+            
+            // Send Overlay
+            sendOverlay: document.getElementById('camera-send-overlay'),
+            sendOverlayClose: document.getElementById('send-overlay-close'),
+            sendUsersList: document.getElementById('send-users-list'),
+            sendOverlayTrash: document.getElementById('send-overlay-trash'),
+            sendOverlayConfirm: document.getElementById('send-overlay-confirm'),
+
+            // Node Viewer
+            nodeViewer: document.getElementById('node-viewer'),
+            nodeViewerImg: document.getElementById('node-viewer-img'),
+            nodeViewerSender: document.getElementById('node-viewer-sender'),
+            nodeViewerTimer: document.getElementById('node-viewer-timer'),
+            nodeViewerClose: document.getElementById('node-viewer-close')
+        };
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // --- UTILS ---
+        const generateZenName = () => {
+            const adjs = ['Misty', 'Silent', 'Wandering', 'Hidden', 'Frosty', 'Bamboo'];
+            const nouns = ['Crane', 'Fox', 'Peak', 'Pine', 'Stream', 'Moon'];
+            return `${adjs[Math.floor(Math.random() * adjs.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+        };
+
+        const showView = (el) => el.classList.remove('view-hidden');
+        const hideView = (el) => el.classList.add('view-hidden');
+
+        // --- AUTHENTICATION ---
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try { await signInWithCustomToken(auth, __initial_auth_token); } 
+                catch (err) { console.error(err); }
+            }
+        };
+
+        onAuthStateChanged(auth, (currentUser) => {
+            state.user = currentUser;
+            hideView(els.loadingView);
+            
+            if (currentUser) {
+                let savedName = localStorage.getItem('node_name');
+                if (savedName) {
+                    state.userName = savedName;
+                    startApp();
+                } else {
+                    // Need identity
+                    showView(els.authView);
+                    hideView(els.loginForm);
+                    showView(els.identityForm);
+                    els.authToggleBtn.style.display = 'none';
+                    els.authTitle.innerText = "Set your identity to enter the forest.";
+                }
+            } else {
+                showView(els.authView);
+                hideView(els.mainInterface);
+            }
+        });
+
+        // Auth Listeners
+        els.authToggleBtn.addEventListener('click', () => {
+            state.isSignUp = !state.isSignUp;
+            els.authTitle.innerText = state.isSignUp ? 'Join the forest.' : 'Welcome back.';
+            els.authSubmitBtn.innerText = state.isSignUp ? 'SIGN UP' : 'SIGN IN';
+            els.authToggleBtn.innerText = state.isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up";
+            if (state.isSignUp) els.authUsername.classList.remove('view-hidden');
+            else els.authUsername.classList.add('view-hidden');
+            els.authError.innerText = '';
+        });
+
+        els.loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            els.authError.innerText = '';
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const username = els.authUsername.value.trim() || generateZenName();
+
+            try {
+                if (state.isSignUp) {
+                    const cred = await createUserWithEmailAndPassword(auth, email, password);
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_users', cred.user.uid), {
+                        username: username, uid: cred.user.uid, timestamp: Date.now()
+                    });
+                    localStorage.setItem('node_name', username);
+                    state.userName = username;
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (err) {
+                els.authError.innerText = err.message.replace('Firebase: ', '');
+            }
+        });
+
+        els.identityForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            els.identityError.innerText = '';
+            const username = els.identityUsername.value.trim() || generateZenName();
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_users', state.user.uid), {
+                    username: username, uid: state.user.uid, timestamp: Date.now()
+                });
+                localStorage.setItem('node_name', username);
+                state.userName = username;
+                startApp();
+            } catch (err) {
+                els.identityError.innerText = "Failed to save identity";
+            }
+        });
+
+        // --- START APP & DATA FETCHING ---
+        const startApp = () => {
+            hideView(els.authView);
+            showView(els.mainInterface);
+            switchTab('camera-view');
+            
+            // Set UI
+            els.inboxUsernameBadge.innerText = state.userName;
+            els.settingsAvatar.innerText = state.userName.charAt(0).toUpperCase();
+            els.settingsNameInput.value = state.userName;
+
+            // Fetch Data
+            if (state.unsubUsers) state.unsubUsers();
+            if (state.unsubMsgs) state.unsubMsgs();
+
+            const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'app_users');
+            state.unsubUsers = onSnapshot(usersRef, (snapshot) => {
+                state.allUsers = snapshot.docs.map(doc => doc.data());
+                renderInbox();
+            }, console.error);
+
+            const msgsRef = collection(db, 'artifacts', appId, 'public', 'data', 'direct_messages');
+            state.unsubMsgs = onSnapshot(msgsRef, (snapshot) => {
+                state.messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                state.messages.sort((a, b) => a.timestamp - b.timestamp);
+                renderInbox();
+                if (state.activeChatUser) renderDM();
+            }, console.error);
+            
+            startCamera();
+        };
+
+        // --- NAVIGATION LOGIC ---
+        const switchTab = (targetId) => {
+            state.activeTab = targetId;
+            els.tabs.forEach(hideView);
+            showView(document.getElementById(targetId));
+
+            // Bottom Nav UI update
+            els.navBtns.forEach(btn => {
+                const iconContainer = btn.querySelector('div');
+                if (btn.dataset.target === targetId || (targetId === 'dm-view' && btn.dataset.target === 'inbox-view')) {
+                    btn.classList.replace('text-[#94a3b8]', 'text-[#6b9080]');
+                    if (iconContainer) {
+                        iconContainer.classList.replace('bg-[#333d39]', 'bg-[#6b9080]');
+                        iconContainer.classList.replace('text-[#94a3b8]', 'text-[#1a1f1d]');
+                    }
+                } else {
+                    btn.classList.replace('text-[#6b9080]', 'text-[#94a3b8]');
+                    if (iconContainer) {
+                        iconContainer.classList.replace('bg-[#6b9080]', 'bg-[#333d39]');
+                        iconContainer.classList.replace('text-[#1a1f1d]', 'text-[#94a3b8]');
+                    }
+                }
+            });
+
+            if (targetId === 'camera-view') startCamera();
+            else stopCamera();
+        };
+
+        els.navBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.target));
+        });
+
+        // --- INBOX LOGIC ---
+        const renderInbox = () => {
+            if (!state.userName) return;
+            const chatPartners = new Map();
+            state.messages.forEach(msg => {
+                if (msg.sender === state.userName || msg.receiver === state.userName) {
+                    const partner = msg.sender === state.userName ? msg.receiver : msg.sender;
+                    chatPartners.set(partner, msg);
+                }
+            });
+
+            const displayUsers = state.allUsers
+                .filter(u => u.username !== state.userName)
+                .map(u => ({
+                    username: u.username,
+                    latestMsg: chatPartners.get(u.username) || null,
+                    timestamp: chatPartners.get(u.username) ? chatPartners.get(u.username).timestamp : u.timestamp || 0
+                }))
+                .sort((a, b) => b.timestamp - a.timestamp);
+
+            els.inboxList.innerHTML = '';
+            
+            if (displayUsers.length === 0) {
+                els.inboxList.innerHTML = `<div class="text-center text-[#94a3b8] mt-10 text-sm tracking-wide">No friends in the forest. Invite someone!</div>`;
+                return;
+            }
+
+            displayUsers.forEach(u => {
+                const msg = u.latestMsg;
+                let statusText = "Tap to chat";
+                let iconName = "message-circle";
+                let iconColor = "text-[#94a3b8]";
+                
+                if (msg) {
+                    const isMe = msg.sender === state.userName;
+                    if (msg.type === 'node') {
+                        statusText = isMe ? "Delivered" : "New Node";
+                        iconName = "image";
+                        iconColor = isMe ? "text-[#94a3b8]" : "text-red-400 animate-pulse";
+                    } else if (msg.type === 'text') {
+                        statusText = isMe ? `Sent: ${msg.text.substring(0, 15)}...` : `Received: ${msg.text.substring(0, 15)}...`;
+                        iconName = "message-circle";
+                        iconColor = isMe ? "text-[#94a3b8]" : "text-[#6b9080]";
+                    } else if (msg.type === 'system') {
+                        statusText = "System Alert";
+                        iconColor = "text-red-500";
+                    }
+                }
+
+                const div = document.createElement('div');
+                div.className = "flex items-center space-x-4 p-4 rounded-2xl bg-[#242b28] active:scale-95 transition-transform border border-[#333d39] cursor-pointer";
+                div.onclick = () => openDM(u.username);
+                div.innerHTML = `
+                    <div class="w-12 h-12 rounded-full bg-[#333d39] flex items-center justify-center text-[#6b9080] font-bold text-lg border border-[#6b9080]/30">
+                        ${u.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="text-white font-medium truncate">${u.username}</p>
+                        <p class="text-xs truncate mt-0.5 ${iconColor}">${statusText}</p>
+                    </div>
+                    <i data-lucide="${iconName}" class="${iconColor} w-[18px] h-[18px]"></i>
+                `;
+                els.inboxList.appendChild(div);
+            });
+            lucide.createIcons();
+        };
+
+        // --- DIRECT MESSAGE LOGIC ---
+        const openDM = (username) => {
+            state.activeChatUser = username;
+            els.dmChatUser.innerText = username;
+            switchTab('dm-view');
+            renderDM();
+        };
+
+        els.dmBackBtn.addEventListener('click', () => {
+            state.activeChatUser = null;
+            switchTab('inbox-view');
+        });
+
+        const renderDM = () => {
+            if (!state.activeChatUser) return;
+            const chatMessages = state.messages.filter(msg => 
+                (msg.sender === state.userName && msg.receiver === state.activeChatUser) ||
+                (msg.sender === state.activeChatUser && msg.receiver === state.userName)
+            );
+
+            els.dmMessagesList.innerHTML = '';
+            if (chatMessages.length === 0) {
+                els.dmMessagesList.innerHTML = `<div class="text-center text-[#94a3b8] mt-10 text-sm">Say hello to ${state.activeChatUser}!</div>`;
+            }
+
+            chatMessages.forEach(msg => {
+                const isMe = msg.sender === state.userName;
+                const div = document.createElement('div');
+                
+                if (msg.type === 'system') {
+                    div.className = "flex justify-center my-2";
+                    div.innerHTML = `<div class="bg-red-900/40 text-red-200 text-xs px-4 py-2 rounded-full border border-red-900/50">${msg.text}</div>`;
+                } 
+                else if (msg.type === 'node') {
+                    div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+                    const btnClass = isMe ? 'bg-[#2a3631] text-[#94a3b8] border border-[#333d39]' : 'bg-red-900/80 text-white active:scale-95 animate-pulse border border-red-500/50';
+                    const cursor = isMe ? 'cursor-default' : 'cursor-pointer';
+                    div.innerHTML = `
+                        <button ${isMe ? 'disabled' : ''} class="node-btn flex items-center space-x-2 px-5 py-3 rounded-2xl shadow-sm transition-all ${btnClass} ${cursor}" data-id="${msg.id}">
+                            <i data-lucide="image" class="w-5 h-5"></i>
+                            <span class="font-semibold text-sm tracking-wide">${isMe ? 'Node Sent' : 'Tap to View Node'}</span>
+                        </button>
+                    `;
+                } 
+                else {
+                    div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+                    const bubbleClass = isMe ? 'bg-[#6b9080] text-[#1a1f1d] rounded-tr-none' : 'bg-[#242b28] text-[#e2e8f0] rounded-tl-none border border-[#333d39]';
+                    div.innerHTML = `<div class="px-5 py-3 text-sm max-w-[80%] break-words rounded-2xl shadow-sm ${bubbleClass}">${msg.text}</div>`;
+                }
+                els.dmMessagesList.appendChild(div);
+            });
+
+            lucide.createIcons();
+            els.dmMessagesList.scrollTop = els.dmMessagesList.scrollHeight;
+
+            // Attach listeners to Node buttons
+            document.querySelectorAll('.node-btn:not([disabled])').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const msgId = e.currentTarget.dataset.id;
+                    const nodeMsg = state.messages.find(m => m.id === msgId);
+                    if (nodeMsg) openNodeViewer(nodeMsg);
+                });
+            });
+        };
+
+        els.dmInput.addEventListener('input', (e) => {
+            els.dmSendBtn.disabled = !e.target.value.trim();
+        });
+
+        els.dmForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = els.dmInput.value.trim();
+            if (!text) return;
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'direct_messages'), {
+                    type: 'text', text: text, sender: state.userName, receiver: state.activeChatUser, timestamp: Date.now()
+                });
+                els.dmInput.value = '';
+                els.dmSendBtn.disabled = true;
+            } catch (err) { console.error("Failed to send message:", err); }
+        });
+
+        // --- NODE VIEWER & SCREENSHOT DETECTION ---
+        const openNodeViewer = (node) => {
+            state.viewingNode = node;
+            state.nodeTimeLeft = 10;
+            els.nodeViewerImg.src = node.photoData;
+            els.nodeViewerSender.innerText = node.sender;
+            els.nodeViewerTimer.innerText = "10s remaining";
+            showView(els.nodeViewer);
+
+            state.nodeTimer = setInterval(() => {
+                state.nodeTimeLeft--;
+                els.nodeViewerTimer.innerText = `${state.nodeTimeLeft}s remaining`;
+                if (state.nodeTimeLeft <= 0) closeNodeViewer();
+            }, 1000);
+        };
+
+        const closeNodeViewer = async () => {
+            if (!state.viewingNode) return;
+            const nodeId = state.viewingNode.id;
+            clearInterval(state.nodeTimer);
+            hideView(els.nodeViewer);
+            els.nodeViewerImg.src = '';
+            state.viewingNode = null;
+            try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'direct_messages', nodeId)); } 
+            catch (e) { console.error(e); }
+        };
+
+        els.nodeViewerClose.addEventListener('click', closeNodeViewer);
+
+        document.addEventListener('visibilitychange', async () => {
+            if (document.hidden && state.viewingNode) {
+                const nodeToBurn = state.viewingNode;
+                clearInterval(state.nodeTimer);
+                hideView(els.nodeViewer);
+                state.viewingNode = null;
+                
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'direct_messages', nodeToBurn.id)); } 
+                catch (e) { console.error(e); }
+
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'direct_messages'), {
+                        type: 'system', sender: state.userName, receiver: nodeToBurn.sender,
+                        text: `👀 ${state.userName} may have taken a screenshot or left the app while viewing your Node!`,
+                        timestamp: Date.now()
+                    });
+                } catch (e) { console.error(e); }
+            }
+        });
+
+        // --- CAMERA LOGIC ---
+        const startCamera = async () => {
+            if (state.cameraStream) return;
+            try {
+                state.cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+                els.video.srcObject = state.cameraStream;
+            } catch (err) { console.error("Camera access denied", err); }
+        };
+
+        const stopCamera = () => {
+            if (state.cameraStream) {
+                state.cameraStream.getTracks().forEach(t => t.stop());
+                state.cameraStream = null;
+                els.video.srcObject = null;
+            }
+        };
+
+        els.captureBtn.addEventListener('click', () => {
+            if (!els.video.srcObject) return;
+            els.canvas.width = els.video.videoWidth;
+            els.canvas.height = els.video.videoHeight;
+            els.canvas.getContext('2d').drawImage(els.video, 0, 0, els.canvas.width, els.canvas.height);
+            state.capturedImg = els.canvas.toDataURL('image/jpeg', 0.4);
+            els.previewImg.src = state.capturedImg;
+            showView(els.previewDiv);
+        });
+
+        const resetCamera = () => {
+            state.capturedImg = null;
+            els.previewImg.src = '';
+            hideView(els.previewDiv);
+            hideView(els.sendOverlay);
+            state.selectedUsers = [];
+        };
+
+        els.cameraTrashBtn.addEventListener('click', resetCamera);
+        els.sendOverlayTrash.addEventListener('click', resetCamera);
+        els.sendOverlayClose.addEventListener('click', resetCamera);
+
+        els.cameraSendToBtn.addEventListener('click', () => {
+            renderSendUsersList();
+            showView(els.sendOverlay);
+        });
+
+        const renderSendUsersList = () => {
+            els.sendUsersList.innerHTML = '';
+            const others = state.allUsers.filter(u => u.username !== state.userName);
+            if (others.length === 0) {
+                els.sendUsersList.innerHTML = `<p class="text-center text-[#94a3b8] mt-10 text-sm">No other users in the forest yet.</p>`;
+            }
+            others.forEach(u => {
+                const isSel = state.selectedUsers.includes(u.username);
+                const div = document.createElement('div');
+                div.className = `p-4 rounded-2xl flex items-center justify-between transition-colors border cursor-pointer ${isSel ? 'bg-[#6b9080]/20 border-[#6b9080]' : 'bg-[#242b28] border-[#333d39]'}`;
+                div.onclick = () => {
+                    if (isSel) state.selectedUsers = state.selectedUsers.filter(name => name !== u.username);
+                    else state.selectedUsers.push(u.username);
+                    els.sendOverlayConfirm.disabled = state.selectedUsers.length === 0;
+                    renderSendUsersList();
+                };
+                div.innerHTML = `
+                    <span class="text-white font-medium">${u.username}</span>
+                    <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSel ? 'border-[#6b9080] bg-[#6b9080]' : 'border-[#94a3b8]'}">
+                        ${isSel ? '<div class="w-2 h-2 bg-[#6b9080] rounded-full"></div>' : ''}
+                    </div>
+                `;
+                els.sendUsersList.appendChild(div);
+            });
+        };
+
+        els.sendOverlayConfirm.addEventListener('click', async () => {
+            if (!state.capturedImg || state.selectedUsers.length === 0) return;
+            els.sendOverlayConfirm.disabled = true;
+            try {
+                for (const receiver of state.selectedUsers) {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'direct_messages'), {
+                        type: 'node', photoData: state.capturedImg, sender: state.userName, receiver: receiver, timestamp: Date.now()
+                    });
+                }
+                resetCamera();
+                switchTab('inbox-view');
+            } catch (err) { console.error("Failed to send node", err); }
+            els.sendOverlayConfirm.disabled = false;
+        });
+
+        // --- SETTINGS LOGIC ---
+        const saveSettings = () => {
+            const newName = els.settingsNameInput.value.trim();
+            if (newName && newName !== state.userName) {
+                state.userName = newName;
+                localStorage.setItem('node_name', newName);
+                els.inboxUsernameBadge.innerText = newName;
+                els.settingsAvatar.innerText = newName.charAt(0).toUpperCase();
+                // Note: To fully update identity, we'd update Firestore app_users document here.
+                setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_users', state.user.uid), {
+                    username: newName, uid: state.user.uid, timestamp: Date.now()
+                }).catch(console.error);
+            }
+        };
+
+        els.settingsNameInput.addEventListener('blur', saveSettings);
+        els.settingsRandomizeBtn.addEventListener('click', () => {
+            els.settingsNameInput.value = generateZenName();
+            saveSettings();
+        });
+
+        // Execute Auth Init
+        initAuth();
+
+    </script>
+</body>
+</html>
